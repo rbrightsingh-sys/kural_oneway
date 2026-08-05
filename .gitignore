@@ -1,0 +1,70 @@
+# =========================
+# Environment Secrets
+# =========================
+# Ignore local environment variables since you have .env.example
+.env
+.env.*
+!.env.example
+
+# =========================
+# Frontend (Node.js / Vite)
+# =========================
+# Dependencies
+node_modules/
+
+# Production build output
+dist/
+dist-ssr/
+build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# Backend (Python)
+# =========================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env_dir/
+
+# Testing/Coverage (if added later)
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# =========================
+# OS & IDE Specific
+# =========================
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Eclipse
+.metadata
+.project
+.classpath
+.settings/
+*.launch
+bin/
+tmp/
+
+# VS Code
+.vscode/
+*.code-workspace
+.history/

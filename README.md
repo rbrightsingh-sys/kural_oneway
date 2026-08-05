@@ -1,0 +1,58 @@
+# Kural 1-Way
+
+Voice-first customer feedback collection. Say it once, we transcribe and route it — no forms, no friction.
+
+```
+kural-one-way/
+├── frontend/                  React + Vite + Tailwind (this deliverable)
+│   ├── src/
+│   │   ├── components/        Modular UI pieces
+│   │   ├── config/            API base URL config
+│   │   ├── hooks/             useVoiceRecorder, useJobPolling
+│   │   ├── App.jsx
+│   │   ├── main.jsx
+│   │   └── index.css
+│   ├── index.html
+│   ├── package.json
+│   ├── tailwind.config.js
+│   ├── postcss.config.js
+│   └── vite.config.js
+│
+├── backend/                    FastAPI server (reserved / stubbed)
+│   ├── main.py                  Minimal working stub matching the contract below
+│   ├── requirements.txt
+│   └── .env.example
+│
+└── README.md
+```
+
+## API contract (frontend ⇄ backend)
+
+| Method | Path                  | Body / Params            | Response                                      |
+|--------|------------------------|---------------------------|------------------------------------------------|
+| POST   | `/api/upload`          | `multipart/form-data` with `file=feedback.webm` (or `text` field for typed feedback) | `{ "job_id": "..." }` |
+| GET    | `/api/job/{job_id}`    | —                          | `{ "status": "pending" \| "processing" \| "completed" \| "failed", "result": {...} }` |
+
+The frontend polls `/api/job/{job_id}` every 2 seconds until `status === "completed"` (or `"failed"`).
+
+## Running the demo
+
+### Backend
+
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend defaults to `http://127.0.0.1:8000` for API calls (see `frontend/src/config/api.js`). Set `VITE_API_BASE_URL` in a `.env` file to point at a deployed backend instead.
