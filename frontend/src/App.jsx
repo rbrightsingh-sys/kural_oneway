@@ -8,6 +8,8 @@ import SuccessModal from "./components/SuccessModal.jsx";
 import ErrorBanner from "./components/ErrorBanner.jsx";
 import TextFallbackToggle from "./components/TextFallbackToggle.jsx";
 import TextFeedbackForm from "./components/TextFeedbackForm.jsx";
+import VoiceFlowAnimation from "./components/VoiceFlowAnimation.jsx";
+import TranslatedPhrasesPanel from "./components/TranslatedPhrasesPanel.jsx";
 import { useVoiceRecorder } from "./hooks/useVoiceRecorder.js";
 import { useJobPolling } from "./hooks/useJobPolling.js";
 import { ENDPOINTS } from "./config/api";
@@ -99,9 +101,26 @@ export default function App() {
   const showTextForm = mode === "text" && (flowState === "ready" || flowState === "error");
   const combinedError = permissionError || uploadError;
 
+  // Drives the right-side voice-flow animation off the real submission lifecycle.
+  const submissionStatus =
+    flowState === "uploading" || flowState === "processing"
+      ? "sending"
+      : flowState === "success"
+      ? "delivered"
+      : "idle";
+
   return (
     <div className="flex min-h-screen flex-col bg-paper">
       <Header />
+
+      {/* Ambient side panels — decorative, hidden below xl so they never
+          compete with the core flow on smaller screens. */}
+      <aside className="pointer-events-none fixed left-10 top-1/2 hidden -translate-y-1/2 xl:block">
+        <TranslatedPhrasesPanel />
+      </aside>
+      <aside className="pointer-events-none fixed right-8 top-1/2 hidden -translate-y-1/2 xl:block">
+        <VoiceFlowAnimation status={submissionStatus} />
+      </aside>
 
       <main className="flex flex-1 flex-col items-center justify-center px-6">
         <div className="flex w-full flex-col items-center">

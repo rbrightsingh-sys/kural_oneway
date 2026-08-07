@@ -9,7 +9,17 @@ export const API_BASE_URL =
 export const ENDPOINTS = {
   upload: `${API_BASE_URL}/api/upload`,
   job: (jobId) => `${API_BASE_URL}/api/job/${jobId}`,
+  dashboardStats: `${API_BASE_URL}/api/dashboard/stats`,
+  dashboardSubmissions: (params = {}) => {
+    const search = new URLSearchParams(
+      Object.entries(params).filter(
+        ([, v]) => v !== undefined && v !== null && v !== ""
+      )
+    );
+    return `${API_BASE_URL}/api/dashboard/submissions?${search.toString()}`;
+  },
 };
 
 export const MAX_RECORDING_SECONDS = 30;
 export const POLL_INTERVAL_MS = 2000;
+export const DASHBOARD_REFRESH_MS = 15000;
