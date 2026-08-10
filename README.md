@@ -41,8 +41,27 @@ The frontend polls `/api/job/{job_id}` every 2 seconds until `status === "comple
 
 ```bash
 cd backend
-python3 -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
+
+>>deactivate
+>> Remove-Item -Recurse -Force venv
+>> py -3.11 -m venv venv
+>> .\venv\Scripts\Activate.ps1
+>> python --version
+>> python -m pip install --upgrade pip
+>> pip install -r requirements.txt
+>>uvicorn main:app --reload --port 8000
+
+
+
+
+
+
+
+
+
+python3 -m venv venv # (python 3.11 need to be used for smooth running)
+# if you have any other version then you can use this "py install 3.11"  to set the terminal
+.\venv\Scripts\Activate.ps1  # Windows: venv\Scripts\activate  (in terminal)
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```

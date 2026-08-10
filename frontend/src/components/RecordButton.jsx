@@ -69,7 +69,9 @@ function ClientInfoCard({ client }) {
 export default function RecordButton({ isRecording, secondsLeft, onClick, disabled, client }) {
   return (
     <div className="flex flex-col items-center">
-      <ClientInfoCard client={client} />
+      <div className="block md:hidden w-full">
+        <ClientInfoCard client={client} />
+      </div>
 
       <div className="relative flex h-56 w-56 items-center justify-center">
         {isRecording && (

@@ -10,6 +10,8 @@ import TextFallbackToggle from "./components/TextFallbackToggle.jsx";
 import TextFeedbackForm from "./components/TextFeedbackForm.jsx";
 import VoiceFlowAnimation from "./components/VoiceFlowAnimation.jsx";
 import TranslatedPhrasesPanel from "./components/TranslatedPhrasesPanel.jsx";
+import EnterpriseInfo from "./components/Enterpriseinfo.jsx";
+import EnterpriseFeedbackBanner from "./components/EnterpriseFeedbackBanner.jsx";
 import { useVoiceRecorder } from "./hooks/useVoiceRecorder.js";
 import { useJobPolling } from "./hooks/useJobPolling.js";
 import { ENDPOINTS } from "./config/api";
@@ -115,11 +117,15 @@ export default function App() {
 
       {/* Ambient side panels — decorative, hidden below xl so they never
           compete with the core flow on smaller screens. */}
-      <aside className="pointer-events-none fixed left-10 top-1/2 hidden -translate-y-1/2 xl:block">
-        <TranslatedPhrasesPanel />
+      <aside className="pointer-events-none fixed left-10 top-1/2 hidden -translate-y-1/2 lg:block">
+        {/* <EnterpriseInfo /> */}
+        <EnterpriseFeedbackBanner/>
       </aside>
-      <aside className="pointer-events-none fixed right-8 top-1/2 hidden -translate-y-1/2 xl:block">
-        <VoiceFlowAnimation status={submissionStatus} />
+      <aside className="pointer-events-none fixed right-8 top-1/2 hidden -translate-y-1/2 lg:block">
+        {/* <VoiceFlowAnimation status={submissionStatus} /> */}
+            <TranslatedPhrasesPanel />
+
+    
       </aside>
 
       <main className="flex flex-1 flex-col items-center justify-center px-6">

@@ -33,6 +33,7 @@ from google.genai import types
 from pydantic import BaseModel
 from pymongo import MongoClient
 from pymongo.collection import Collection
+import certifi
 
 load_dotenv()
 
@@ -58,10 +59,12 @@ CLIENT_NAME = "Pothys"
 # MongoDB
 # ---------------------------------------------------------------------------
 
-MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME", "kural_one_way")
+MONGODB_URI ="mongodb+srv://rbrightsingh_db_user:ilDuIl0FR0075hcA@cluster0.jviyzvf.mongodb.net/?appName=Cluster0"
+#  os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+MONGODB_DB_NAME ="kural_oneway"
+#  os.getenv("MONGODB_DB_NAME", "kural_one_way")
 
-mongo_client = MongoClient(MONGODB_URI)
+mongo_client = MongoClient(MONGODB_URI,tlsCAFile=certifi.where())
 db = mongo_client[MONGODB_DB_NAME]
 submissions: Collection = db["feedback_submissions"]
 
@@ -107,8 +110,11 @@ def get_submission(job_id: str) -> Optional[dict]:
 
 # fix this hardcoded key and model in the code, and use the .env file instead
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL")
+GEMINI_API_KEY =""
+# 'AQ.Ab8RN6IMfsQvZxBFU1pnPH1liEL8CWDsnyRvluak_9f4OqFPjw' 
+# os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL ="gemini-3.5-flash"
+#  os.getenv("GEMINI_MODEL")
 
 TRANSCRIBE_PROMPT = (
     "Please transcribe this audio file and provide the text content only, "
