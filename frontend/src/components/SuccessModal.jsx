@@ -20,10 +20,10 @@ export default function SuccessModal({ onSubmitAnother }) {
         </div>
 
         <h2 id="success-title" className="mt-5 font-display text-2xl text-ink">
-          Feedback received
+          Thank You!
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-ink/60">
-          Thank you for taking the time to share your voice. Your feedback has
+          Thank you for taking the time to share your voice. Your kural has
           been sent to the team.
         </p>
 
@@ -32,7 +32,7 @@ export default function SuccessModal({ onSubmitAnother }) {
           onClick={onSubmitAnother}
           className="mt-7 w-full rounded-full bg-harbor px-6 py-3 text-sm font-medium text-white transition hover:bg-harbor-dark"
         >
-          Share more feedback
+          Share your kural
         </button>
       </div>
     </div>

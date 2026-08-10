@@ -1,6 +1,6 @@
 const COPY = {
   ready: {
-    title: "Tap to speak your feedback",
+    title: "Tap to speak your Kural",
     subtitle: "Up to 30 seconds. We're listening.",
   },
   recording: {
