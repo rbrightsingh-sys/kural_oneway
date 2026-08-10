@@ -31,8 +31,8 @@ export default function SuccessModal({ onSubmitAnother }) {
           type="button"
           onClick={onSubmitAnother}
           className="mt-7 w-full rounded-full bg-harbor px-6 py-3 text-sm font-medium text-white transition hover:bg-harbor-dark"
-        >
-          Share your kural
+    >
+          Share your kural's
         </button>
       </div>
     </div>
