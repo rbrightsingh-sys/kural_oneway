@@ -121,10 +121,38 @@ TRANSCRIBE_PROMPT = (
     "with no additional commentary or preamble."
 )
 
+# SUMMARIZE_PROMPT_TEMPLATE = (
+#     "Summarize the following customer feedback in 1-2 concise sentences. "
+#     "Capture the key point and overall sentiment. Respond with the summary "
+#     "text only, no preamble.\n\nFeedback:\n{transcript}"
+# )
+
 SUMMARIZE_PROMPT_TEMPLATE = (
-    "Summarize the following customer feedback in 1-2 concise sentences. "
-    "Capture the key point and overall sentiment. Respond with the summary "
-    "text only, no preamble.\n\nFeedback:\n{transcript}"
+    "Analyze the following customer feedback and provide a concise summary. "
+    "Capture the key point and overall sentiment in 1-2 sentences. "
+    "Also classify the feedback into a relevant category and assign an urgency score.\n\n"
+
+    "Sentiment: Choose exactly one of: Positive, Negative, or Neutral.\n"
+    "Urgency: Assign a number from 1-5 based on how urgently the issue requires attention:\n"
+    "1 = Very low urgency, informational or minor feedback\n"
+    "2 = Low urgency, can be addressed later\n"
+    "3 = Moderate urgency, should be addressed in a reasonable timeframe\n"
+    "4 = High urgency, requires prompt attention\n"
+    "5 = Critical urgency, requires immediate attention\n"
+    "Category: Choose the category that best represents the main topic of the feedback. "
+    "Examples include Pricing, Quality, Service, Staff, Product, Delivery, Support, "
+    "Technical Issue, Billing, Experience, or Other. "
+    "The category is not limited to these examples; create a more appropriate category "
+    "when necessary.\n\n"
+
+    "Use exactly this format:\n"
+    "Summary: <1-2 sentence summary>\n"
+    "Sentiment: <Positive/Negative/Neutral>\n"
+    "Urgency: <1-5>\n"
+    "Category: <category>\n\n"
+
+    "Respond only in this format, with no additional commentary.\n\n"
+    "Feedback:\n{transcript}"
 )
 
 MIME_TYPES = {

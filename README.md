@@ -41,6 +41,7 @@ The frontend polls `/api/job/{job_id}` every 2 seconds until `status === "comple
 
 ```bash
 cd backend
+<<<<<<< HEAD
 
 >>deactivate
 >> Remove-Item -Recurse -Force venv
@@ -62,9 +63,16 @@ cd backend
 python3 -m venv venv # (python 3.11 need to be used for smooth running)
 # if you have any other version then you can use this "py install 3.11"  to set the terminal
 .\venv\Scripts\Activate.ps1  # Windows: venv\Scripts\activate  (in terminal)
+=======
+python3 -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
+#git bash: source .venv/Scripts/activate
+>>>>>>> de1ce9509126d2c5c7ae8c22b5fb446a7a09a5cf
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
+
+
 
 ### Frontend
 
