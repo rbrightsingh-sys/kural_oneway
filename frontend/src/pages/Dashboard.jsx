@@ -60,6 +60,32 @@ function formatTimestamp(iso) {
   });
 }
 
+function toISODate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+// Shared by the table's date filter and the report panel's quick-range
+// buttons. All ranges are inclusive, calendar-day, UTC.
+function getPresetRange(key) {
+  const end = new Date();
+  end.setUTCHours(0, 0, 0, 0);
+  const start = new Date(end);
+
+  if (key === "yesterday") {
+    start.setUTCDate(start.getUTCDate() - 1);
+    end.setUTCDate(end.getUTCDate() - 1);
+  } else if (key === "last7") {
+    start.setUTCDate(start.getUTCDate() - 6);
+  } else if (key === "last30") {
+    start.setUTCDate(start.getUTCDate() - 29);
+  } else if (key === "last365") {
+    start.setUTCDate(start.getUTCDate() - 364);
+  }
+  // "today" (and any unknown key) leaves start === end.
+
+  return { from: toISODate(start), to: toISODate(end) };
+}
+
 function TrendChart({ trend }) {
   const data = trend.map((t) => ({ ...t, label: formatDayLabel(t.date) }));
 
@@ -159,7 +185,158 @@ function FilterSelect({ value, onChange, options, label }) {
   );
 }
 
-function SubmissionsTable({ items, total, page, pageSize, onPageChange, statusFilter, setStatusFilter, kindFilter, setKindFilter }) {
+const DATE_RANGE_PRESETS = [
+  { key: "last7", label: "Last week" },
+  { key: "last30", label: "Last month" },
+  { key: "last365", label: "Last year" },
+];
+
+function DateRangeFilter({ dateFrom, dateTo, onChange }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs text-ink/50">
+      <span>Date</span>
+      <input
+        type="date"
+        value={dateFrom}
+        max={dateTo || undefined}
+        onChange={(e) => onChange({ from: e.target.value, to: dateTo })}
+        className="rounded-lg border border-mist bg-white px-2.5 py-1.5 text-sm text-ink outline-none focus-visible:border-harbor"
+      />
+      <span>to</span>
+      <input
+        type="date"
+        value={dateTo}
+        min={dateFrom || undefined}
+        onChange={(e) => onChange({ from: dateFrom, to: e.target.value })}
+        className="rounded-lg border border-mist bg-white px-2.5 py-1.5 text-sm text-ink outline-none focus-visible:border-harbor"
+      />
+      {DATE_RANGE_PRESETS.map((p) => (
+        <button
+          key={p.key}
+          type="button"
+          onClick={() => onChange(getPresetRange(p.key))}
+          className="rounded-full border border-mist px-2.5 py-1 font-medium text-ink/60 transition hover:bg-mist"
+        >
+          {p.label}
+        </button>
+      ))}
+      {(dateFrom || dateTo) && (
+        <button
+          type="button"
+          onClick={() => onChange({ from: "", to: "" })}
+          className="rounded-full px-2.5 py-1 font-medium text-flag transition hover:bg-flag/10"
+        >
+          Clear
+        </button>
+      )}
+    </div>
+  );
+}
+
+const REPORT_PRESETS = [
+  { key: "today", label: "Today" },
+  { key: "yesterday", label: "Yesterday" },
+  { key: "last7", label: "Last week" },
+  { key: "last30", label: "Last month" },
+];
+
+function ReportPanel({ onGenerate, onClose }) {
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
+  return (
+    <div className="absolute right-0 top-full z-20 mt-2 w-72 rounded-2xl border border-mist bg-white p-4 shadow-card">
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink/45">Quick range</p>
+      <div className="mb-4 flex flex-wrap gap-2">
+        {REPORT_PRESETS.map((p) => (
+          <button
+            key={p.key}
+            type="button"
+            onClick={() => {
+              const range = getPresetRange(p.key);
+              onGenerate(range.from, range.to);
+              onClose();
+            }}
+            className="rounded-full border border-mist px-2.5 py-1 text-xs font-medium text-ink/70 transition hover:bg-mist"
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink/45">Custom range</p>
+      <div className="flex flex-col gap-2">
+        <input
+          type="date"
+          value={from}
+          max={to || undefined}
+          onChange={(e) => setFrom(e.target.value)}
+          className="rounded-lg border border-mist bg-white px-2.5 py-1.5 text-sm text-ink outline-none focus-visible:border-harbor"
+        />
+        <input
+          type="date"
+          value={to}
+          min={from || undefined}
+          onChange={(e) => setTo(e.target.value)}
+          className="rounded-lg border border-mist bg-white px-2.5 py-1.5 text-sm text-ink outline-none focus-visible:border-harbor"
+        />
+        <button
+          type="button"
+          disabled={!from || !to}
+          onClick={() => {
+            onGenerate(from, to);
+            onClose();
+          }}
+          className="rounded-lg bg-harbor px-3 py-1.5 text-sm font-medium text-white transition hover:bg-harbor/90 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Download PDF
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ReportButton() {
+  const [open, setOpen] = useState(false);
+
+  const handleGenerate = (dateFrom, dateTo) => {
+    const url = ENDPOINTS.dashboardReport({ date_from: dateFrom, date_to: dateTo });
+    window.open(url, "_blank");
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="rounded-lg border border-mist bg-white px-3.5 py-2 text-sm font-medium text-ink/70 shadow-card transition hover:bg-mist"
+      >
+        Download report
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <ReportPanel onGenerate={handleGenerate} onClose={() => setOpen(false)} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function SubmissionsTable({
+  items,
+  total,
+  page,
+  pageSize,
+  onPageChange,
+  statusFilter,
+  setStatusFilter,
+  kindFilter,
+  setKindFilter,
+  dateFrom,
+  dateTo,
+  onDateChange,
+}) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
@@ -189,6 +366,10 @@ function SubmissionsTable({ items, total, page, pageSize, onPageChange, statusFi
             ]}
           />
         </div>
+      </div>
+
+      <div className="mb-4">
+        <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onChange={onDateChange} />
       </div>
 
       <div className="overflow-x-auto">
@@ -271,6 +452,8 @@ export default function Dashboard() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
   const [kindFilter, setKindFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -293,13 +476,15 @@ export default function Dashboard() {
         page_size: PAGE_SIZE,
         status: statusFilter,
         kind: kindFilter,
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
       })
     );
     if (!res.ok) throw new Error("Failed to load submissions.");
     const data = await res.json();
     setTableItems(data.items);
     setTableTotal(data.total);
-  }, [page, statusFilter, kindFilter]);
+  }, [page, statusFilter, kindFilter, dateFrom, dateTo]);
 
   // Initial load + periodic refresh of the overview/recent feed.
   useEffect(() => {
@@ -336,16 +521,19 @@ export default function Dashboard() {
   // Reset to page 1 when filters change.
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, kindFilter]);
+  }, [statusFilter, kindFilter, dateFrom, dateTo]);
 
   return (
     <div className="flex min-h-screen flex-col bg-paper">
       <Header />
 
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 pb-16">
-        <div>
-          <p className="font-display text-2xl text-ink">Dashboard</p>
-          <p className="text-sm text-ink/45">Feedback submissions for Pothys</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="font-display text-2xl text-ink">Dashboard</p>
+            <p className="text-sm text-ink/45">Feedback submissions for Pothys</p>
+          </div>
+          <ReportButton />
         </div>
 
         {loading && <p className="text-sm text-ink/45">Loading…</p>}
@@ -385,6 +573,12 @@ export default function Dashboard() {
               setStatusFilter={setStatusFilter}
               kindFilter={kindFilter}
               setKindFilter={setKindFilter}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              onDateChange={({ from, to }) => {
+                setDateFrom(from);
+                setDateTo(to);
+              }}
             />
           </>
         )}
