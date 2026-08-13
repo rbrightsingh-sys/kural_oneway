@@ -10,7 +10,7 @@ export default function ProcessingState() {
           <span className="h-2 w-2 rounded-full bg-harbor/70 animate-bounce" />
         </div>
       </div>
-      <p className="mt-7 font-display text-2xl text-ink">Processing your feedback</p>
+      <p className="mt-7 font-display text-2xl text-ink">Processing your kural</p>
       <p className="mt-1.5 text-sm text-ink/55">This usually takes a few seconds.</p>
     </div>
   );

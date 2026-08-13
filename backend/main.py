@@ -110,11 +110,8 @@ def get_submission(job_id: str) -> Optional[dict]:
 
 # fix this hardcoded key and model in the code, and use the .env file instead
 
-GEMINI_API_KEY =""
-# 'AQ.Ab8RN6IMfsQvZxBFU1pnPH1liEL8CWDsnyRvluak_9f4OqFPjw' 
-# os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL ="gemini-3.5-flash"
-#  os.getenv("GEMINI_MODEL")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL")
 
 TRANSCRIBE_PROMPT = (
     "Please transcribe this audio file and provide the text content only, "

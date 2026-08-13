@@ -1,19 +1,23 @@
+import Icon from './Icon'; // Update this path to match your project structure
+
 export default function Header() {
   return (
-    <header className="flex items-center justify-center gap-2.5 py-8">
-      <span className="font-display text-xl text-ink tracking-tight">Kural</span>
-      <span
-        className="font-display text-xl text-signal-dark"
-        lang="ta"
-        aria-hidden="true"
-      >
-        குரல்
-      </span>
-      {/*<span className="ml-1 rounded-full bg-mist px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-ink/50">
-        <img src="kural_logo1.png" alt="Kural AI logo" className="h-5 w-5" />
+    // Added 'relative' to the header so the absolute child stays contained
+    <header className="relative flex items-center justify-center py-8 px-4">
+      
+      {/* Mic Icon Container - Pinned to the left */}
+      <div className="absolute left-4 md:left-8">
+        <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-signal/10 text-signal ring-1 ring-signal/30">
+          <Icon name="mic" className="w-4.5 h-4.5" />
+          <span className="absolute inset-0 rounded-full ring-1 ring-signal/40 animate-pulseRing" />
+        </span>
+      </div>
 
-      </span>*/}
-      <img src="kural_logo1.png" alt="Kural AI logo" className="h-5 w-5" />
+      {/* Title - Remains perfectly centered */}
+      <span className="font-display text-xl text-ink tracking-tight">
+        Kural 1-Way
+      </span>
+      
     </header>
   );
 }

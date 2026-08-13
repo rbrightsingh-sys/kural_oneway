@@ -148,7 +148,7 @@ export default function EnterpriseFeedbackBanner({
           </div>
 
           {/* CTA into the feedback form */}
-          <button
+         {/* <button
             onClick={onStartFeedback}
             className="group mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-[rgb(var(--maroon))] px-5 py-3.5 text-[14px] font-semibold text-[rgb(var(--paper))] transition-transform hover:scale-[1.01] active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[rgb(var(--gold))]"
           >
@@ -157,7 +157,7 @@ export default function EnterpriseFeedbackBanner({
               · கருத்து தெரிவிக்க
             </span>
             <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />
-          </button>
+          </button> */}
         </div>
       </div>
     </div>

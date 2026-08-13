@@ -63,6 +63,7 @@ export default {
         "scale-in": "scale-in 0.25s cubic-bezier(0.16,1,0.3,1) both",
         "travel-down": "travel-down 1.6s ease-in-out infinite",
         "receive-pulse": "receive-pulse 0.9s cubic-bezier(0.16,1,0.3,1) 1",
+        pulseRing: "pulseRing 2.2s cubic-bezier(0.4,0,0.6,1) infinite",
       },
     },
   },
