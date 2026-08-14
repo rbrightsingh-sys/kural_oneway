@@ -214,7 +214,7 @@ GEMINI_API_KEY ='AQ.Ab8RN6IpNJwQEcxzE_k6cqTIEICtN_tFeAVuzbZL8F9dM-1dlg'
 
  
 # os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL ="gemini-3.5-flash"
+GEMINI_MODEL ="gemini-2.5-flash"
 #  os.getenv("GEMINI_MODEL")
 
 TRANSCRIBE_PROMPT = (
