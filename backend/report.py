@@ -57,21 +57,25 @@ REPORT_STATUS_LABELS = {"completed": "Completed", "processing": "Processing", "f
 
 
 def parse_report_datetime(value: str, end_of_day: bool = False) -> datetime:
-    """Parse a 'YYYY-MM-DD' (or full ISO-8601) string into a UTC datetime.
-    Date-only strings are expanded to the start (00:00:00.000000) or end
-    (23:59:59.999999) of that UTC calendar day, so a `date_to` of
-    '2026-08-13' includes the whole day rather than cutting off at midnight."""
+    """Parse a date/time as IST and convert it to UTC for MongoDB queries."""
     value = value.strip()
+
     try:
-        if len(value) == 10:  # "YYYY-MM-DD"
+        if len(value) == 10:  # YYYY-MM-DD
             dt = datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=IST)
+
             if end_of_day:
                 dt = dt + timedelta(days=1) - timedelta(microseconds=1)
-            return dt
+
+            return dt.astimezone(timezone.utc)
+
         dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(IST)
+            dt = dt.replace(tzinfo=IST)
+
+        return dt.astimezone(timezone.utc)
+
     except ValueError:
         raise HTTPException(
             status_code=400,
@@ -170,9 +174,13 @@ def build_report_pdf(
     ]
     for d in docs:
         created = d.get("created_at")
+        created_ist = created.astimezone(IST) if created else None
         table_data.append(
             [
-                Paragraph(created.strftime("%Y-%m-%d %H:%M") if created else "\u2014", cell_style),
+                Paragraph(
+            created_ist.strftime("%Y-%m-%d %H:%M") if created_ist else "—",
+            cell_style
+        ),
                 Paragraph((d.get("kind") or "\u2014").title(), cell_style),
                 Paragraph(REPORT_STATUS_LABELS.get(d.get("status"), d.get("status") or "\u2014"), cell_style),
                 Paragraph(d.get("transcript_text") or "\u2014", cell_style),

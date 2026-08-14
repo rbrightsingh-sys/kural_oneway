@@ -349,7 +349,7 @@ async def dashboard_stats():
     }
 
     # Submissions per day, last TREND_DAYS days (UTC calendar days, zero-filled).
-    since = utcnow() - timedelta(days=TREND_DAYS - 1)
+    since = datetime.now(timezone.utc) - timedelta(days=TREND_DAYS - 1)
     trend_docs = list(
         submissions.aggregate(
             [
@@ -423,7 +423,11 @@ async def dashboard_submissions(
             "transcript_text": doc.get("transcript_text"),
             "summary": doc.get("summary"),
             "error": doc.get("error"),
-            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
+            "created_at": (
+                doc.get("created_at").astimezone(IST).isoformat()
+                if doc.get("created_at")
+                else None
+                ),
         }
         for doc in cursor
     ]
