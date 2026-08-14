@@ -208,7 +208,8 @@ def get_submission(job_id: str) -> Optional[dict]:
 
 # fix this hardcoded key and model in the code, and use the .env file instead
 
-GEMINI_API_KEY ='AQ.Ab8RN6Le5nHVSkYSvBMajfsEt8UYD4jUZYp802_CMT5WRGNchQ'
+GEMINI_API_KEY ='AQ.Ab8RN6IpNJwQEcxzE_k6cqTIEICtN_tFeAVuzbZL8F9dM-1dlg'
+# 'AQ.Ab8RN6Le5nHVSkYSvBMajfsEt8UYD4jUZYp802_CMT5WRGNchQ'
 # 'AQ.Ab8RN6IpNJwQEcxzE_k6cqTIEICtN_tFeAVuzbZL8F9dM-1dlg'
 # 'AQ.Ab8RN6IMfsQvZxBFU1pnPH1liEL8CWDsnyRvluak_9f4OqFPjw'
 # "AQ.Ab8RN6LYGim4FShwxBmoscT8U-cQ-fga28TE_cg0oRug88wUKQ""
