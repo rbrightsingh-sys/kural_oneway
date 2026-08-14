@@ -3,8 +3,10 @@
 // VITE_API_BASE_URL (e.g. in a .env file or your hosting provider's env config)
 // to point at the deployed backend instead.
 
-export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+export const API_BASE_URL ="https://kural-oneway.onrender.com"
+  // import.meta.env.VITE_API_BASE_URL || "https://kural-oneway.onrender.com"||"http://127.0.0.1:8000";
+
+
 
 export const ENDPOINTS = {
   upload: `${API_BASE_URL}/api/upload`,
