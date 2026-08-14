@@ -22,18 +22,22 @@ finishes.
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
+from io import BytesIO
 from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, File, Form, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from google import genai
 from google.genai import types
 from pydantic import BaseModel
 from pymongo import MongoClient
 from pymongo.collection import Collection
 import certifi
+
+from report import build_report_pdf, parse_report_datetime
 
 load_dotenv()
 
@@ -74,9 +78,9 @@ def ensure_indexes():
     submissions.create_index("job_id", unique=True)
     submissions.create_index([("client_name", 1), ("created_at", -1)])
 
-
-def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+IST = timezone(timedelta(hours=5, minutes=30))
+def ist_now() -> datetime:
+    return datetime.now(IST)
 
 
 def create_submission(job_id: str, kind: str, audio_url: Optional[str]) -> None:
@@ -91,8 +95,9 @@ def create_submission(job_id: str, kind: str, audio_url: Optional[str]) -> None:
             "transcript_text": None,
             "summary": None,
             "error": None,
-            "created_at": utcnow(),
-            "updated_at": utcnow(),
+            "gender": None,
+            "created_at": ist_now(),
+            "updated_at": ist_now(),
         }
     )
 
@@ -100,7 +105,7 @@ def create_submission(job_id: str, kind: str, audio_url: Optional[str]) -> None:
 def update_submission(job_id: str, **fields) -> None:
     submissions.update_one(
         {"job_id": job_id},
-        {"$set": {**fields, "updated_at": utcnow()}},
+        {"$set": {**fields, "updated_at": ist_now()}},
     )
 
 
@@ -110,10 +115,10 @@ def get_submission(job_id: str) -> Optional[dict]:
 
 # fix this hardcoded key and model in the code, and use the .env file instead
 
-GEMINI_API_KEY ='AQ.Ab8RN6LYGim4FShwxBmoscT8U-cQ-fga28TE_cg0oRug88wUKQ
-' 
+GEMINI_API_KEY ="AQ.Ab8RN6LYGim4FShwxBmoscT8U-cQ-fga28TE_cg0oRug88wUKQ"
+# 'AQ.Ab8RN6IMfsQvZxBFU1pnPH1liEL8CWDsnyRvluak_9f4OqFPjw' 
 # os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL ="gemini-2.5-flash"
+GEMINI_MODEL ="gemini-3.5-flash"
 #  os.getenv("GEMINI_MODEL")
 
 TRANSCRIBE_PROMPT = (
@@ -347,7 +352,7 @@ async def dashboard_stats():
     }
 
     # Submissions per day, last TREND_DAYS days (UTC calendar days, zero-filled).
-    since = utcnow() - timedelta(days=TREND_DAYS - 1)
+    since = datetime.now(timezone.utc) - timedelta(days=TREND_DAYS - 1)
     trend_docs = list(
         submissions.aggregate(
             [
@@ -387,12 +392,22 @@ async def dashboard_submissions(
     page_size: int = Query(default=10, ge=1, le=100),
     status: Optional[str] = Query(default=None),
     kind: Optional[str] = Query(default=None),
+    date_from: Optional[str] = Query(default=None, description="YYYY-MM-DD, inclusive"),
+    date_to: Optional[str] = Query(default=None, description="YYYY-MM-DD, inclusive"),
 ):
     query: dict = {"client_name": CLIENT_NAME}
     if status and status != "all":
         query["status"] = status
     if kind and kind != "all":
         query["kind"] = kind
+
+    created_at_filter = {}
+    if date_from:
+        created_at_filter["$gte"] = parse_report_datetime(date_from)
+    if date_to:
+        created_at_filter["$lte"] = parse_report_datetime(date_to, end_of_day=True)
+    if created_at_filter:
+        query["created_at"] = created_at_filter
 
     total = submissions.count_documents(query)
 
@@ -411,12 +426,36 @@ async def dashboard_submissions(
             "transcript_text": doc.get("transcript_text"),
             "summary": doc.get("summary"),
             "error": doc.get("error"),
-            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
+            "created_at": (
+                doc.get("created_at").astimezone(IST).isoformat()
+                if doc.get("created_at")
+                else None
+                ),
         }
         for doc in cursor
     ]
 
     return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+
+# ---------------------------------------------------------------------------
+# PDF report generation — see report.py; main.py just calls it.
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/dashboard/report")
+async def dashboard_report(
+    date_from: Optional[str] = Query(default=None, description="YYYY-MM-DD, inclusive"),
+    date_to: Optional[str] = Query(default=None, description="YYYY-MM-DD, inclusive"),
+):
+    pdf_bytes = build_report_pdf(submissions, CLIENT_NAME, date_from, date_to)
+    bits = [b for b in (date_from, date_to) if b]
+    filename = "kural-feedback-report" + (f"_{'_to_'.join(bits)}" if bits else "") + ".pdf"
+    return StreamingResponse(
+        BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/api/health")
