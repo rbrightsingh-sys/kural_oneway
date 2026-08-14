@@ -2,7 +2,7 @@
 ALLOWED_ORIGINS=http://localhost:5173
 
 # Required for speech-to-text transcription.
-GEMINI_API_KEY=AQ.Ab8RN6IMfsQvZxBFU1pnPH1liEL8CWDsnyRvluak_9f4OqFPjw
+GEMINI_API_KEY=AQAb8RN6IMfsQvZxBFU1pnPH1liEL8CWDsnyRvluak_9f4Oqw
 GEMINI_MODEL=gemini-3.5-flash
 
 MONGODB_URI=mongodb+srv://rbrightsingh_db_user:ilDuIl0FR0075hcA@cluster0.jviyzvf.mongodb.net/?appName=Cluster0
