@@ -145,13 +145,15 @@ SUMMARIZE_PROMPT_TEMPLATE = (
     "Examples include Pricing, Quality, Service, Staff, Product, Delivery, Support, "
     "Technical Issue, Billing, Experience, or Other. "
     "The category is not limited to these examples; create a more appropriate category "
-    "when necessary.\n\n"
+    "when necessary.\n"
+    "Gender: Choose the gender that best represents the speaker based on their voice.\n\n"
 
     "Use exactly this format:\n"
     "Summary: <1-2 sentence summary>\n"
     "Sentiment: <Positive/Negative/Neutral>\n"
     "Urgency: <1-5>\n"
-    "Category: <category>\n\n"
+    "Category: <category>\n"
+    "Gender: <gender>\n\n"
 
     "Respond only in this format, with no additional commentary.\n\n"
     "Feedback:\n{transcript}"
