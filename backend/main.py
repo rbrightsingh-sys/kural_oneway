@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from google import genai
@@ -35,14 +35,9 @@ from google.genai import types
 from pydantic import BaseModel
 from pymongo import MongoClient
 from pymongo.collection import Collection
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import mm
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont as ReportLabTTFont
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 import certifi
+
+from report import build_report_pdf, parse_report_datetime
 
 load_dotenv()
 
@@ -83,32 +78,9 @@ def ensure_indexes():
     submissions.create_index("job_id", unique=True)
     submissions.create_index([("client_name", 1), ("created_at", -1)])
 
-
-def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def parse_report_datetime(value: str, end_of_day: bool = False) -> datetime:
-    """Parse a 'YYYY-MM-DD' (or full ISO-8601) string into a UTC datetime.
-    Date-only strings are expanded to the start (00:00:00.000000) or end
-    (23:59:59.999999) of that UTC calendar day, so a `date_to` of
-    '2026-08-13' includes the whole day rather than cutting off at midnight."""
-    value = value.strip()
-    try:
-        if len(value) == 10:  # "YYYY-MM-DD"
-            dt = datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-            if end_of_day:
-                dt = dt + timedelta(days=1) - timedelta(microseconds=1)
-            return dt
-        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid date {value!r}; expected YYYY-MM-DD.",
-        )
+IST = timezone(timedelta(hours=5, minutes=30))
+def ist_now() -> datetime:
+    return datetime.now(IST)
 
 
 def create_submission(job_id: str, kind: str, audio_url: Optional[str]) -> None:
@@ -123,8 +95,9 @@ def create_submission(job_id: str, kind: str, audio_url: Optional[str]) -> None:
             "transcript_text": None,
             "summary": None,
             "error": None,
-            "created_at": utcnow(),
-            "updated_at": utcnow(),
+            "gender": None,
+            "created_at": ist_now(),
+            "updated_at": ist_now(),
         }
     )
 
@@ -132,7 +105,7 @@ def create_submission(job_id: str, kind: str, audio_url: Optional[str]) -> None:
 def update_submission(job_id: str, **fields) -> None:
     submissions.update_one(
         {"job_id": job_id},
-        {"$set": {**fields, "updated_at": utcnow()}},
+        {"$set": {**fields, "updated_at": ist_now()}},
     )
 
 
@@ -459,153 +432,8 @@ async def dashboard_submissions(
 
 
 # ---------------------------------------------------------------------------
-# PDF report generation
+# PDF report generation — see report.py; main.py just calls it.
 # ---------------------------------------------------------------------------
-
-# ReportLab's built-in PDF fonts (Helvetica, Times, Courier) only cover
-# Latin-1 — any Tamil (or other non-Latin) codepoint renders as a "missing
-# glyph" box. This is a font problem, not a storage/encoding one: MongoDB
-# and Python strings hold the Tamil text correctly the whole way through.
-# Noto Sans Tamil covers both the Tamil block and Basic Latin, so one font
-# handles transcripts/summaries that mix English and Tamil.
-FONTS_DIR = Path(__file__).parent / "fonts"
-UNICODE_FONT_NAME = "NotoSansTamil"
-try:
-    pdfmetrics.registerFont(
-        ReportLabTTFont(UNICODE_FONT_NAME, str(FONTS_DIR / "NotoSansTamil-Regular.ttf"))
-    )
-except Exception as exc:  # noqa: BLE001 — degrade to Helvetica rather than crash the app
-    print(f"⚠️  Could not load {UNICODE_FONT_NAME} font, Tamil text will not render in PDFs: {exc}")
-    UNICODE_FONT_NAME = "Helvetica"
-
-REPORT_STATUS_LABELS = {"completed": "Completed", "processing": "Processing", "failed": "Failed"}
-
-
-def build_report_pdf(date_from: Optional[str], date_to: Optional[str]) -> bytes:
-    """Query submissions in the given (inclusive) UTC date range and render
-    them into a PDF: a summary strip of counts, followed by a table of
-    every matching submission."""
-    query: dict = {"client_name": CLIENT_NAME}
-    created_at_filter = {}
-    if date_from:
-        created_at_filter["$gte"] = parse_report_datetime(date_from)
-    if date_to:
-        created_at_filter["$lte"] = parse_report_datetime(date_to, end_of_day=True)
-    if created_at_filter:
-        query["created_at"] = created_at_filter
-
-    docs = list(submissions.find(query).sort("created_at", 1))
-
-    total = len(docs)
-    completed = sum(1 for d in docs if d.get("status") == "completed")
-    processing = sum(1 for d in docs if d.get("status") == "processing")
-    failed = sum(1 for d in docs if d.get("status") == "failed")
-    audio_count = sum(1 for d in docs if d.get("kind") == "audio")
-    text_count = sum(1 for d in docs if d.get("kind") == "text")
-
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        topMargin=18 * mm,
-        bottomMargin=16 * mm,
-        leftMargin=16 * mm,
-        rightMargin=16 * mm,
-        title="Kural 1-Way Feedback Report",
-    )
-
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle("ReportTitle", parent=styles["Title"], fontSize=18, spaceAfter=2)
-    meta_style = ParagraphStyle("ReportMeta", parent=styles["Normal"], textColor=colors.HexColor("#555555"))
-    cell_style = ParagraphStyle(
-        "Cell", parent=styles["Normal"], fontName=UNICODE_FONT_NAME, fontSize=8, leading=10
-    )
-    header_cell_style = ParagraphStyle(
-        "HeaderCell", parent=cell_style, textColor=colors.white, fontName="Helvetica-Bold"
-    )
-
-    range_label = f"{date_from or 'earliest'} \u2014 {date_to or 'latest'}"
-
-    elements = [
-        Paragraph("Kural 1-Way \u2014 Feedback Report", title_style),
-        Paragraph(f"Client: {CLIENT_NAME}", meta_style),
-        Paragraph(f"Date range: {range_label} (UTC)", meta_style),
-        Paragraph(f"Generated: {utcnow().strftime('%Y-%m-%d %H:%M UTC')}", meta_style),
-        Spacer(1, 8 * mm),
-    ]
-
-    summary_table = Table(
-        [
-            ["Total", "Completed", "Processing", "Failed", "Audio", "Text"],
-            [str(total), str(completed), str(processing), str(failed), str(audio_count), str(text_count)],
-        ],
-        hAlign="LEFT",
-    )
-    summary_table.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0C8A7D")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E4E7EE")),
-                ("TOPPADDING", (0, 0), (-1, -1), 6),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ]
-        )
-    )
-    elements += [summary_table, Spacer(1, 8 * mm)]
-
-    table_data = [
-        [
-            Paragraph("Time (UTC)", header_cell_style),
-            Paragraph("Type", header_cell_style),
-            Paragraph("Status", header_cell_style),
-            Paragraph("Transcript", header_cell_style),
-            Paragraph("Summary", header_cell_style),
-        ]
-    ]
-    for d in docs:
-        created = d.get("created_at")
-        table_data.append(
-            [
-                Paragraph(created.strftime("%Y-%m-%d %H:%M") if created else "\u2014", cell_style),
-                Paragraph((d.get("kind") or "\u2014").title(), cell_style),
-                Paragraph(REPORT_STATUS_LABELS.get(d.get("status"), d.get("status") or "\u2014"), cell_style),
-                Paragraph(d.get("transcript_text") or "\u2014", cell_style),
-                Paragraph(
-                    d.get("summary")
-                    or (d.get("error") if d.get("status") == "failed" else None)
-                    or "\u2014",
-                    cell_style,
-                ),
-            ]
-        )
-
-    if len(table_data) == 1:
-        elements.append(Paragraph("No submissions found in this date range.", styles["Normal"]))
-    else:
-        report_table = Table(
-            table_data,
-            colWidths=[26 * mm, 16 * mm, 20 * mm, 62 * mm, 58 * mm],
-            repeatRows=1,
-        )
-        report_table.setStyle(
-            TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#12141C")),
-                    ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#E4E7EE")),
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F5F6F2")]),
-                    ("TOPPADDING", (0, 0), (-1, -1), 4),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                ]
-            )
-        )
-        elements.append(report_table)
-
-    doc.build(elements)
-    return buffer.getvalue()
 
 
 @app.get("/api/dashboard/report")
@@ -613,7 +441,7 @@ async def dashboard_report(
     date_from: Optional[str] = Query(default=None, description="YYYY-MM-DD, inclusive"),
     date_to: Optional[str] = Query(default=None, description="YYYY-MM-DD, inclusive"),
 ):
-    pdf_bytes = build_report_pdf(date_from, date_to)
+    pdf_bytes = build_report_pdf(submissions, CLIENT_NAME, date_from, date_to)
     bits = [b for b in (date_from, date_to) if b]
     filename = "kural-feedback-report" + (f"_{'_to_'.join(bits)}" if bits else "") + ".pdf"
     return StreamingResponse(
