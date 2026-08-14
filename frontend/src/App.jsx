@@ -23,14 +23,103 @@ export default function App() {
   const [mode, setMode] = useState("voice"); // "voice" | "text"
   const [flowState, setFlowState] = useState(INITIAL_FLOW_STATE);
   const [uploadError, setUploadError] = useState(null);
+  const [userGeo, setUserGeo] = useState(null);
 
   const { status: pollStatus, error: pollError, pollJob, reset: resetPolling } = useJobPolling();
+
+  const requestUserGeo = useCallback(() => {
+    if (!navigator.geolocation) {
+      console.warn("Geolocation is not supported by this browser.");
+      return Promise.resolve(null);
+    }
+
+    return new Promise((resolve) => {
+      console.log("Requesting user geolocation...");
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const geoPayload = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            timestamp: position.timestamp,
+            source: "home_page",
+          };
+
+          console.log("Geolocation received from browser:", geoPayload);
+          setUserGeo(geoPayload);
+
+          try {
+            const response = await fetch(ENDPOINTS.geo, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(geoPayload),
+            });
+            console.log("Geolocation backend response:", response.status, response.ok);
+          } catch (error) {
+            console.warn("Could not send geolocation to backend", error);
+          }
+
+          resolve(geoPayload);
+        },
+        (error) => {
+          console.warn("Geolocation permission failed or was denied:", error.code, error.message);
+          setUserGeo(null);
+          resolve(null);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 30000,
+          maximumAge: 0,
+        }
+      );
+    });
+  }, []);
+
+  useEffect(() => {
+    requestUserGeo();
+  }, [requestUserGeo]);
+
+  const appendGeoLocation = useCallback((formData) => {
+    if (!userGeo) return;
+
+    const geoFields = {
+      latitude: userGeo.latitude,
+      longitude: userGeo.longitude,
+      accuracy: userGeo.accuracy,
+      geo_timestamp: userGeo.timestamp,
+      source: userGeo.source,
+    };
+
+    Object.entries(geoFields).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formData.append(key, String(value));
+      }
+    });
+  }, [userGeo]);
 
   const uploadFeedback = useCallback(
     async (formData) => {
       setUploadError(null);
       setFlowState("uploading");
       try {
+        const geoReady = userGeo ?? (await requestUserGeo());
+        if (geoReady) {
+          setUserGeo(geoReady);
+          const geoFields = {
+            latitude: geoReady.latitude,
+            longitude: geoReady.longitude,
+            accuracy: geoReady.accuracy,
+            geo_timestamp: geoReady.timestamp,
+            source: geoReady.source,
+          };
+
+          Object.entries(geoFields).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+              formData.append(key, String(value));
+            }
+          });
+        }
+
         const res = await fetch(ENDPOINTS.upload, {
           method: "POST",
           body: formData,
@@ -46,7 +135,7 @@ export default function App() {
         setFlowState("error");
       }
     },
-    [pollJob]
+    [pollJob, requestUserGeo, userGeo]
   );
 
   const handleAudioReady = useCallback(

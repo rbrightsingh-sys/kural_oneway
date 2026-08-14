@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, FastAPI, File, Form, Query, UploadFile
+from fastapi import BackgroundTasks, Body, FastAPI, File, Form, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from google import genai
@@ -36,6 +36,7 @@ from pydantic import BaseModel
 from pymongo import MongoClient
 from pymongo.collection import Collection
 import certifi
+import requests
 
 from report import build_report_pdf, parse_report_datetime
 
@@ -71,38 +72,130 @@ MONGODB_DB_NAME ="kural_oneway"
 mongo_client = MongoClient(MONGODB_URI,tlsCAFile=certifi.where())
 db = mongo_client[MONGODB_DB_NAME]
 submissions: Collection = db["feedback_submissions"]
+visitor_locations: Collection = db["visitor_locations"]
 
 
 @app.on_event("startup")
 def ensure_indexes():
     submissions.create_index("job_id", unique=True)
     submissions.create_index([("client_name", 1), ("created_at", -1)])
+    visitor_locations.create_index([("created_at", -1)])
 
 IST = timezone(timedelta(hours=5, minutes=30))
 def ist_now() -> datetime:
     return datetime.now(IST)
 
 
-def create_submission(job_id: str, kind: str, audio_url: Optional[str]) -> None:
-    submissions.insert_one(
-        {
-            "job_id": job_id,
-            "client_name": CLIENT_NAME,
-            "kind": kind,
-            "audio_url": audio_url,
-            "status": "processing",
-            "stt_raw_response": None,
-            "transcript_text": None,
-            "summary": None,
-            "error": None,
-            "gender": None,
-            "created_at": ist_now(),
-            "updated_at": ist_now(),
-        }
-    )
+def reverse_geocode_place_name(latitude: Optional[float], longitude: Optional[float]) -> Optional[str]:
+    if latitude is None or longitude is None:
+        return None
+
+    try:
+        response = requests.get(
+            "https://nominatim.openstreetmap.org/reverse",
+            params={
+                "lat": latitude,
+                "lon": longitude,
+                "format": "jsonv2",
+                "addressdetails": 1,
+            },
+            headers={"User-Agent": "KuralOneWay/1.0"},
+            timeout=10,
+        )
+        response.raise_for_status()
+        data = response.json()
+        address = data.get("address") or {}
+
+        local_place = next(
+            (
+                value
+                for value in [
+                    address.get("village"),
+                    address.get("hamlet"),
+                    address.get("locality"),
+                    address.get("town"),
+                    address.get("municipality"),
+                    address.get("city"),
+                    address.get("suburb"),
+                    address.get("neighbourhood"),
+                    address.get("quarter"),
+                ]
+                if value
+            ),
+            None,
+        )
+
+        place_parts = []
+        if local_place:
+            place_parts.append(local_place)
+
+        for extra in [
+            address.get("district"),
+            address.get("county"),
+            address.get("state"),
+            address.get("country"),
+        ]:
+            if extra and extra != local_place:
+                place_parts.append(extra)
+
+        if place_parts:
+            return ", ".join(place_parts)
+
+        return data.get("display_name")
+    except Exception as exc:  # noqa: BLE001
+        print(f"⚠️ [geo] Reverse geocode failed for ({latitude}, {longitude}): {exc}")
+        return None
+
+
+def create_submission(
+    job_id: str,
+    kind: str,
+    audio_url: Optional[str],
+    geolocation: Optional[dict] = None,
+) -> None:
+    payload = {
+        "job_id": job_id,
+        "client_name": CLIENT_NAME,
+        "kind": kind,
+        "audio_url": audio_url,
+        "status": "processing",
+        "stt_raw_response": None,
+        "transcript_text": None,
+        "summary": None,
+        "error": None,
+        "gender": None,
+        "created_at": ist_now(),
+        "updated_at": ist_now(),
+    }
+
+    if geolocation:
+        geolocation = dict(geolocation)
+        place_name = geolocation.get("place_name") or reverse_geocode_place_name(
+            geolocation.get("latitude"), geolocation.get("longitude")
+        )
+        if place_name:
+            geolocation["place_name"] = place_name
+            payload["place_name"] = place_name
+
+        payload["geolocation"] = geolocation
+        if geolocation.get("latitude") is not None:
+            payload["latitude"] = geolocation["latitude"]
+        if geolocation.get("longitude") is not None:
+            payload["longitude"] = geolocation["longitude"]
+        if geolocation.get("accuracy") is not None:
+            payload["accuracy"] = geolocation["accuracy"]
+        if geolocation.get("timestamp") is not None:
+            payload["geo_timestamp"] = geolocation["timestamp"]
+
+    submissions.insert_one(payload)
 
 
 def update_submission(job_id: str, **fields) -> None:
+    existing = get_submission(job_id) or {}
+    for key in ("geolocation", "latitude", "longitude", "accuracy", "geo_timestamp", "place_name", "source"):
+        if existing.get(key) is not None and key not in fields:
+            fields[key] = existing[key]
+
     submissions.update_one(
         {"job_id": job_id},
         {"$set": {**fields, "updated_at": ist_now()}},
@@ -115,8 +208,10 @@ def get_submission(job_id: str) -> Optional[dict]:
 
 # fix this hardcoded key and model in the code, and use the .env file instead
 
-GEMINI_API_KEY ="AQ.Ab8RN6LYGim4FShwxBmoscT8U-cQ-fga28TE_cg0oRug88wUKQ"
-# 'AQ.Ab8RN6IMfsQvZxBFU1pnPH1liEL8CWDsnyRvluak_9f4OqFPjw' 
+GEMINI_API_KEY ='AQ.Ab8RN6IpNJwQEcxzE_k6cqTIEICtN_tFeAVuzbZL8F9dM-1dlg'
+# 'AQ.Ab8RN6IMfsQvZxBFU1pnPH1liEL8CWDsnyRvluak_9f4OqFPjw'
+# "AQ.Ab8RN6LYGim4FShwxBmoscT8U-cQ-fga28TE_cg0oRug88wUKQ"
+ 
 # os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL ="gemini-3.5-flash"
 #  os.getenv("GEMINI_MODEL")
@@ -278,6 +373,48 @@ class JobStatus(BaseModel):
     status: str
     result: Optional[dict] = None
 
+
+class GeoLocationPayload(BaseModel):
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    accuracy: Optional[float] = None
+    timestamp: Optional[float] = None
+    source: str = "home_page"
+    place_name: Optional[str] = None
+
+
+def save_geolocation(payload: GeoLocationPayload):
+    place_name = payload.place_name or reverse_geocode_place_name(payload.latitude, payload.longitude)
+    print(
+        "\n📍 [geo] Received location: "
+        f"source={payload.source}, "
+        f"latitude={payload.latitude}, "
+        f"longitude={payload.longitude}, "
+        f"accuracy={payload.accuracy}, "
+        f"timestamp={payload.timestamp}, "
+        f"place_name={place_name}\n"
+    )
+    if place_name:
+        print(f"📍 [geo] Place: {place_name}")
+
+    location_data = {
+        "source": payload.source,
+        "latitude": payload.latitude,
+        "longitude": payload.longitude,
+        "accuracy": payload.accuracy,
+        "timestamp": payload.timestamp,
+        "place_name": place_name,
+        "created_at": ist_now(),
+    }
+    if payload.latitude is not None and payload.longitude is not None:
+        location_data["coordinates"] = {
+            "type": "Point",
+            "coordinates": [payload.longitude, payload.latitude],
+        }
+    visitor_locations.insert_one(location_data)
+    return location_data
+
+
 def process_audio_job(job_id: str, file_path: Path, mime_type: str):
     try:
         transcript, gender, raw_response = transcribe_audio(
@@ -295,6 +432,11 @@ def process_audio_job(job_id: str, file_path: Path, mime_type: str):
 
         print(f"📋 [job {job_id}] Summary:\n{summary}\n")
 
+        existing = get_submission(job_id) or {}
+        place_name = existing.get("place_name") or existing.get("geolocation", {}).get("place_name")
+        if place_name:
+            print(f"✅ [job {job_id}] Completed place: {place_name}")
+
         update_submission(
             job_id,
             status="completed",
@@ -305,6 +447,10 @@ def process_audio_job(job_id: str, file_path: Path, mime_type: str):
         )
 
     except Exception as exc:  # noqa: BLE001 — surfaced to the client via job status
+        existing = get_submission(job_id) or {}
+        place_name = existing.get("place_name") or existing.get("geolocation", {}).get("place_name")
+        if place_name:
+            print(f"❌ [job {job_id}] Failed place: {place_name}")
         update_submission(
             job_id,
             status="failed",
@@ -316,14 +462,29 @@ def process_audio_job(job_id: str, file_path: Path, mime_type: str):
 
 
 def process_text_job(job_id: str, text: str):
-    summary = "Thanks — your feedback has been received and routed to the team."
-    update_submission(
-        job_id,
-        status="completed",
-        transcript_text=text,
-        summary=summary,
-        gender=None,  # Text jobs don't have gender information
-    )
+    try:
+        summary = "Thanks — your feedback has been received and routed to the team."
+        existing = get_submission(job_id) or {}
+        place_name = existing.get("place_name") or existing.get("geolocation", {}).get("place_name")
+        if place_name:
+            print(f"✅ [job {job_id}] Completed place: {place_name}")
+        update_submission(
+            job_id,
+            status="completed",
+            transcript_text=text,
+            summary=summary,
+            gender=None,
+        )
+    except Exception as exc:  # noqa: BLE001
+        existing = get_submission(job_id) or {}
+        place_name = existing.get("place_name") or existing.get("geolocation", {}).get("place_name")
+        if place_name:
+            print(f"❌ [job {job_id}] Failed place: {place_name}")
+        update_submission(
+            job_id,
+            status="failed",
+            error=str(exc)
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -331,13 +492,33 @@ def process_text_job(job_id: str, text: str):
 # ---------------------------------------------------------------------------
 
 
+@app.post("/api/geo")
+async def store_geolocation(payload: GeoLocationPayload = Body(...)):
+    save_geolocation(payload)
+    return {"message": "Geolocation stored successfully"}
+
+
 @app.post("/api/upload", response_model=JobResponse)
 async def upload_feedback(
     background_tasks: BackgroundTasks,
     file: Optional[UploadFile] = File(default=None),
     text: Optional[str] = Form(default=None),
+    latitude: Optional[float] = Form(default=None),
+    longitude: Optional[float] = Form(default=None),
+    accuracy: Optional[float] = Form(default=None),
+    geo_timestamp: Optional[float] = Form(default=None),
+    source: Optional[str] = Form(default="feedback_submit"),
 ):
     job_id = str(uuid.uuid4())
+    geolocation = None
+    if latitude is not None or longitude is not None or accuracy is not None:
+        geolocation = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "accuracy": accuracy,
+            "timestamp": geo_timestamp,
+            "source": source,
+        }
 
     if file is not None:
         mime_type = file.content_type or guess_mime_type(file.filename or "feedback.webm")
@@ -348,15 +529,15 @@ async def upload_feedback(
         # Local path for now — point this at your bucket/CDN URL in production.
         audio_url = str(dest.resolve())
 
-        create_submission(job_id, kind="audio", audio_url=audio_url)
+        create_submission(job_id, kind="audio", audio_url=audio_url, geolocation=geolocation)
         background_tasks.add_task(process_audio_job, job_id, dest, mime_type)
 
     elif text is not None and text.strip():
-        create_submission(job_id, kind="text", audio_url=None)
+        create_submission(job_id, kind="text", audio_url=None, geolocation=geolocation)
         background_tasks.add_task(process_text_job, job_id, text.strip())
 
     else:
-        create_submission(job_id, kind="unknown", audio_url=None)
+        create_submission(job_id, kind="unknown", audio_url=None, geolocation=geolocation)
         update_submission(job_id, status="failed", error="No audio file or text was provided.")
 
     return {"job_id": job_id}
@@ -486,6 +667,10 @@ async def dashboard_submissions(
             "transcript_text": doc.get("transcript_text"),
             "summary": doc.get("summary"),
             "error": doc.get("error"),
+            "latitude": doc.get("latitude"),
+            "longitude": doc.get("longitude"),
+            "accuracy": doc.get("accuracy"),
+            "place_name": doc.get("place_name"),
             "created_at": (
                 doc.get("created_at").astimezone(IST).isoformat()
                 if doc.get("created_at")
