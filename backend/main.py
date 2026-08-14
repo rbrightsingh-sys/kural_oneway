@@ -122,15 +122,19 @@ GEMINI_MODEL ="gemini-3.5-flash"
 #  os.getenv("GEMINI_MODEL")
 
 TRANSCRIBE_PROMPT = (
-    "Please transcribe this audio file and provide the text content only, "
-    "with no additional commentary or preamble."
+    "Transcribe the audio file and identify the apparent gender of the speaker "
+    "based only on the voice characteristics in the audio. "
+    "Do not infer gender from the content or words spoken. "
+    "If the speaker's gender cannot be determined with reasonable confidence, "
+    "use Unknown.\n\n"
+
+    "Use exactly this format:\n"
+    "Transcript: <transcribed text>\n"
+    "Gender: <Male/Female/Unknown>\n\n"
+
+    "Respond only in this format, with no additional commentary or preamble."
 )
 
-# SUMMARIZE_PROMPT_TEMPLATE = (
-#     "Summarize the following customer feedback in 1-2 concise sentences. "
-#     "Capture the key point and overall sentiment. Respond with the summary "
-#     "text only, no preamble.\n\nFeedback:\n{transcript}"
-# )
 
 SUMMARIZE_PROMPT_TEMPLATE = (
     "Analyze the following customer feedback and provide a concise summary. "
@@ -138,25 +142,33 @@ SUMMARIZE_PROMPT_TEMPLATE = (
     "Also classify the feedback into a relevant category and assign an urgency score.\n\n"
 
     "Sentiment: Choose exactly one of: Positive, Negative, or Neutral.\n"
+
     "Urgency: Assign a number from 1-5 based on how urgently the issue requires attention:\n"
     "1 = Very low urgency, informational or minor feedback\n"
     "2 = Low urgency, can be addressed later\n"
     "3 = Moderate urgency, should be addressed in a reasonable timeframe\n"
     "4 = High urgency, requires prompt attention\n"
     "5 = Critical urgency, requires immediate attention\n"
+
     "Category: Choose the category that best represents the main topic of the feedback. "
     "Examples include Pricing, Quality, Service, Staff, Product, Delivery, Support, "
     "Technical Issue, Billing, Experience, or Other. "
     "The category is not limited to these examples; create a more appropriate category "
     "when necessary.\n\n"
 
+    "Gender: Use the gender identified during audio transcription. "
+    "Do not infer or modify the gender value.\n\n"
+
     "Use exactly this format:\n"
     "Summary: <1-2 sentence summary>\n"
     "Sentiment: <Positive/Negative/Neutral>\n"
     "Urgency: <1-5>\n"
-    "Category: <category>\n\n"
+    "Category: <category>\n"
+    "Gender: <gender>\n\n"
 
     "Respond only in this format, with no additional commentary.\n\n"
+
+    "Detected Gender: {gender}\n\n"
     "Feedback:\n{transcript}"
 )
 
@@ -192,9 +204,11 @@ def guess_mime_type(filename: str, fallback: str = "audio/webm") -> str:
 
 
 def transcribe_audio(file_path: Path, mime_type: str):
-    """Blocking Gemini call — safe to run in a background task since
-    FastAPI/Starlette runs sync background tasks in a threadpool.
-    Returns (transcript_text, raw_response_dict)."""
+    """Blocking Gemini call.
+
+    Returns:
+        (transcript_text, gender, raw_response_dict)
+    """
     client = get_client()
     audio_bytes = file_path.read_bytes()
 
@@ -205,19 +219,49 @@ def transcribe_audio(file_path: Path, mime_type: str):
             TRANSCRIBE_PROMPT,
         ],
     )
-    transcript = (response.text or "").strip()
+
+    raw_text = (response.text or "").strip()
+
+    # Defaults in case Gemini returns an unexpected format
+    transcript = raw_text
+    gender = "Unknown"
+
+    # Parse:
+    # Transcript: ...
+    # Gender: Male/Female/Unknown
+    for line in raw_text.splitlines():
+        line = line.strip()
+
+        if line.lower().startswith("transcript:"):
+            transcript = line.split(":", 1)[1].strip()
+
+        elif line.lower().startswith("gender:"):
+            detected_gender = line.split(":", 1)[1].strip()
+
+            if detected_gender.lower() in {"male", "female", "unknown"}:
+                gender = detected_gender.capitalize()
+
     raw_response = response.model_dump(mode="json")
-    return transcript, raw_response
+
+    return transcript, gender, raw_response
 
 
-def summarize_transcript(transcript: str) -> str:
-    """Second Gemini call: takes the transcript produced by transcribe_audio()
-    and asks Gemini to condense it into a short summary."""
+def summarize_transcript(transcript: str, gender: str) -> str:
+    """Second Gemini call: summarizes the transcript and uses
+    the gender detected during audio transcription."""
+
     client = get_client()
+
     response = client.models.generate_content(
         model=GEMINI_MODEL,
-        contents=[SUMMARIZE_PROMPT_TEMPLATE.format(transcript=transcript)],
+        contents=[
+            SUMMARIZE_PROMPT_TEMPLATE.format(
+                transcript=transcript,
+                gender=gender,
+            )
+        ],
     )
+
     return (response.text or "").strip()
 
 
@@ -234,13 +278,21 @@ class JobStatus(BaseModel):
     status: str
     result: Optional[dict] = None
 
-
 def process_audio_job(job_id: str, file_path: Path, mime_type: str):
     try:
-        transcript, raw_response = transcribe_audio(file_path, mime_type)
-        print(f"\n📝 [job {job_id}] Transcript:\n{transcript}\n")
+        transcript, gender, raw_response = transcribe_audio(
+            file_path,
+            mime_type
+        )
 
-        summary = summarize_transcript(transcript)
+        print(f"\n📝 [job {job_id}] Transcript:\n{transcript}\n")
+        print(f"👤 [job {job_id}] Gender: {gender}\n")
+
+        summary = summarize_transcript(
+            transcript,
+            gender
+        )
+
         print(f"📋 [job {job_id}] Summary:\n{summary}\n")
 
         update_submission(
@@ -249,11 +301,18 @@ def process_audio_job(job_id: str, file_path: Path, mime_type: str):
             stt_raw_response=raw_response,
             transcript_text=transcript,
             summary=summary,
+            gender=gender,
         )
+
     except Exception as exc:  # noqa: BLE001 — surfaced to the client via job status
-        update_submission(job_id, status="failed", error=str(exc))
-    #finally:
-        #file_path.unlink(missing_ok=True)
+        update_submission(
+            job_id,
+            status="failed",
+            error=str(exc)
+        )
+
+    # finally:
+    #     file_path.unlink(missing_ok=True)
 
 
 def process_text_job(job_id: str, text: str):
@@ -263,6 +322,7 @@ def process_text_job(job_id: str, text: str):
         status="completed",
         transcript_text=text,
         summary=summary,
+        gender=None,  # Text jobs don't have gender information
     )
 
 
