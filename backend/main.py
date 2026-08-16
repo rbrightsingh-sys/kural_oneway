@@ -173,6 +173,14 @@ def create_submission(
         place_name = geolocation.get("place_name") or reverse_geocode_place_name(
             geolocation.get("latitude"), geolocation.get("longitude")
         )
+#         In practice
+# This can happen because:
+
+# Some users share location and some do not.
+# Some devices give coordinates; some give only rough or missing values.
+# Reverse geocoding is not always reliable in rural/remote areas.
+# OpenStreetMap can occasionally fail or rate-limit requests.
+# The DB stores place_name only when it is available.
         if place_name:
             geolocation["place_name"] = place_name
             payload["place_name"] = place_name
@@ -208,7 +216,8 @@ def get_submission(job_id: str) -> Optional[dict]:
 
 # fix this hardcoded key and model in the code, and use the .env file instead
 
-GEMINI_API_KEY ='AQ.Ab8RN6IpNJwQEcxzE_k6cqTIEICtN_tFeAVuzbZL8F9dM-1dlg'
+GEMINI_API_KEY ="AQ.Ab8RN6JiK_43_6i1jO-SlR2NV4styyaYLrN4gTgGyOa2DVtHnw"
+# "AQ.Ab8RN6Le5nHVSkYSvBMajfsEt8UYD4jUZYp802_CMT5WRGNchQ"
 # 'AQ.Ab8RN6Le5nHVSkYSvBMajfsEt8UYD4jUZYp802_CMT5WRGNchQ'
 # 'AQ.Ab8RN6IpNJwQEcxzE_k6cqTIEICtN_tFeAVuzbZL8F9dM-1dlg'
 # 'AQ.Ab8RN6IMfsQvZxBFU1pnPH1liEL8CWDsnyRvluak_9f4OqFPjw'
@@ -216,7 +225,7 @@ GEMINI_API_KEY ='AQ.Ab8RN6IpNJwQEcxzE_k6cqTIEICtN_tFeAVuzbZL8F9dM-1dlg'
 
  
 # os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL ="gemini-3.6-flash"
+GEMINI_MODEL ="gemini-3.5-flash"
 #  os.getenv("GEMINI_MODEL")
 
 TRANSCRIBE_PROMPT = (
