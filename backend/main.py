@@ -216,7 +216,7 @@ def get_submission(job_id: str) -> Optional[dict]:
 
 # fix this hardcoded key and model in the code, and use the .env file instead
 
-GEMINI_API_KEY ="AQ.Ab8RN6JiK_43_6i1jO-SlR2NV4styyaYLrN4gTgGyOa2DVtHnw"
+# GEMINI_API_KEY ="AQ.Ab8RN6JiK_43_6i1jO-SlR2NV4styyaYLrN4gTgGyOa2DVtHnw"
 # "AQ.Ab8RN6Le5nHVSkYSvBMajfsEt8UYD4jUZYp802_CMT5WRGNchQ"
 # 'AQ.Ab8RN6Le5nHVSkYSvBMajfsEt8UYD4jUZYp802_CMT5WRGNchQ'
 # 'AQ.Ab8RN6IpNJwQEcxzE_k6cqTIEICtN_tFeAVuzbZL8F9dM-1dlg'
@@ -224,9 +224,9 @@ GEMINI_API_KEY ="AQ.Ab8RN6JiK_43_6i1jO-SlR2NV4styyaYLrN4gTgGyOa2DVtHnw"
 # "AQ.Ab8RN6LYGim4FShwxBmoscT8U-cQ-fga28TE_cg0oRug88wUKQ""
 
  
-# os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL ="gemini-3.5-flash"
-#  os.getenv("GEMINI_MODEL")
+os.getenv("GEMINI_API_KEY")
+# GEMINI_MODEL ="gemini-3.5-flash"
+ os.getenv("GEMINI_MODEL")
 
 TRANSCRIBE_PROMPT = (
     "Transcribe the audio file and identify the apparent gender of the speaker "
