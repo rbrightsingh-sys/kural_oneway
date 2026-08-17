@@ -224,9 +224,9 @@ def get_submission(job_id: str) -> Optional[dict]:
 # "AQ.Ab8RN6LYGim4FShwxBmoscT8U-cQ-fga28TE_cg0oRug88wUKQ""
 
  
-os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY=os.getenv("GEMINI_API_KEY")
 # GEMINI_MODEL ="gemini-3.5-flash"
-os.getenv("GEMINI_MODEL")
+GEMINI_MODEL=os.getenv("GEMINI_MODEL")
 
 TRANSCRIBE_PROMPT = (
     "Transcribe the audio file and identify the apparent gender of the speaker "
